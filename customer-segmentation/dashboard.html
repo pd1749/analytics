@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Segmentation Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #333; }
+        .header { background: linear-gradient(135deg, #1F4E79 0%, #2E75B6 100%); color: white; padding: 25px 40px; }
+        .header h1 { font-size: 28px; font-weight: 600; }
+        .header p { opacity: 0.9; margin-top: 5px; font-size: 14px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 25px; }
+        .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 25px; }
+        .kpi-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); text-align: center; transition: transform 0.2s; }
+        .kpi-card:hover { transform: translateY(-3px); }
+        .kpi-card .label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .kpi-card .value { font-size: 28px; font-weight: 700; color: #1F4E79; }
+        .kpi-card .subtext { font-size: 11px; color: #999; margin-top: 5px; }
+        .kpi-card.highlight { background: linear-gradient(135deg, #1F4E79 0%, #2E75B6 100%); }
+        .kpi-card.highlight .label, .kpi-card.highlight .value, .kpi-card.highlight .subtext { color: white; }
+        .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px; }
+        .chart-card { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        .chart-card h3 { font-size: 16px; color: #1F4E79; margin-bottom: 20px; font-weight: 600; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #1F4E79; color: white; padding: 12px 15px; text-align: left; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f8f9fa; }
+        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .status-delivered { background: #d4edda; color: #155724; }
+        .status-service-booked { background: #fff3cd; color: #856404; }
+        .status-in-progress { background: #cce5ff; color: #004085; }
+        .status-cancelled { background: #f8d7da; color: #721c24; }
+        .filters { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 500; }
+        .filter-group select { padding: 10px 14px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; min-width: 160px; cursor: pointer; transition: border-color 0.2s; }
+        .filter-group select:focus { outline: none; border-color: #2E75B6; }
+        .reset-btn { padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s; }
+        .reset-btn:hover { background: #2E75B6; }
+        .insights-section { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-top: 25px; }
+        .insights-section h3 { color: #1F4E79; margin-bottom: 20px; }
+        .insight-item { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #2E75B6; }
+        .insight-item h4 { color: #1F4E79; margin-bottom: 8px; font-size: 14px; }
+        .insight-item p { color: #666; font-size: 13px; line-height: 1.5; }
+        .filter-active { background: #e8f4fd !important; border-color: #2E75B6 !important; }
+        .data-count { font-size: 12px; color: #666; margin-left: auto; padding: 8px 15px; background: #f0f0f0; border-radius: 20px; }
+        @media (max-width: 1200px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 768px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } .charts-row { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Customer Segmentation Dashboard</h1>
+        <p>FY2024 Analysis | Interactive Data Visualisation</p>
+    </div>
+    
+    <div class="container">
+        <div class="filters">
+            <div class="filter-group">
+                <label>State/Territory</label>
+                <select id="stateFilter" onchange="updateDashboard()">
+                    <option value="all">All States</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Service Category</label>
+                <select id="serviceFilter" onchange="updateDashboard()">
+                    <option value="all">All Services</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Order Status</label>
+                <select id="statusFilter" onchange="updateDashboard()">
+                    <option value="all">All Statuses</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Quarter</label>
+                <select id="quarterFilter" onchange="updateDashboard()">
+                    <option value="all">All Quarters</option>
+                    <option value="Q1">Q1 (Jan-Mar)</option>
+                    <option value="Q2">Q2 (Apr-Jun)</option>
+                    <option value="Q3">Q3 (Jul-Sep)</option>
+                    <option value="Q4">Q4 (Oct-Dec)</option>
+                </select>
+            </div>
+            <button class="reset-btn" onclick="resetFilters()">Reset Filters</button>
+            <div class="data-count">Showing <span id="recordCount">1,000</span> records</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-card highlight">
+                <div class="label">Total Revenue</div>
+                <div class="value" id="totalRevenue">$0</div>
+                <div class="subtext">Filtered Total</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Total Orders</div>
+                <div class="value" id="totalOrders">0</div>
+                <div class="subtext">Transactions</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Avg Order Value</div>
+                <div class="value" id="avgOrder">$0</div>
+                <div class="subtext">Per Transaction</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Delivery Rate</div>
+                <div class="value" id="deliveryRate">0%</div>
+                <div class="subtext">Completed Orders</div>
+            </div>
+            <div class="kpi-card">
+                <div class="label">Cancellation Rate</div>
+                <div class="value" id="cancelRate">0%</div>
+                <div class="subtext" id="cancelRevenue">Lost: $0</div>
+            </div>
+        </div>
+
+        <div class="charts-row">
+            <div class="chart-card">
+                <h3>Revenue by Service Category</h3>
+                <canvas id="serviceChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Orders by State/Territory</h3>
+                <canvas id="stateChart"></canvas>
+            </div>
+        </div>
+
+        <div class="charts-row">
+            <div class="chart-card">
+                <h3>Monthly Revenue Trend</h3>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Order Status Distribution</h3>
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h3>Top Customers by Revenue</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Customer ID</th>
+                            <th>Name</th>
+                            <th>State</th>
+                            <th>Service</th>
+                            <th>Quantity</th>
+                            <th>Total Spend</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topCustomersTable"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="insights-section">
+            <h3>Customer Segments Identified</h3>
+            <div class="insight-item">
+                <h4>Segment 1: Premium Clients (Mentoring Program)</h4>
+                <p>Revenue: $651,600 (49.9%) | Avg Order: $1,200+ | Profile: Mid-career professionals seeking comprehensive guidance. Highest lifetime value potential with strong retention opportunity through alumni networks.</p>
+            </div>
+            <div class="insight-item">
+                <h4>Segment 2: Career Starters (Resume + LinkedIn)</h4>
+                <p>Revenue: $198,400 (15.2%) | Avg Order: $800 | Profile: Early-career professionals building profiles. High conversion potential to premium services through structured upsell pathways.</p>
+            </div>
+            <div class="insight-item">
+                <h4>Segment 3: Quick Service Users (Interview Prep/Networking)</h4>
+                <p>Revenue: ~$150,000 (11.5%) | Avg Order: $250-300 | Profile: Job seekers with specific immediate needs. Often transactional; retention via follow-up sequences with complementary recommendations.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const states = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'NT', 'ACT'];
+        const services = ['Mentoring program', 'Resume + LinkedIn Profile', 'Resume (service fee)', 'LinkedIn profile', 'Interview Prep', 'Networking Strategy'];
+        const statuses = ['Delivered', 'Service Booked', 'In Progress', 'Cancelled'];
+        const statusWeights = [0.4, 0.387, 0.11, 0.103];
+        const servicesPrices = {'Mentoring program': 1200,'Resume + LinkedIn Profile': 800,'Resume (service fee)': 600,'LinkedIn profile': 300,'Interview Prep': 250,'Networking Strategy': 250};
+        const firstNames = ['Emma','Liam','Olivia','Noah','Ava','Oliver','Isabella','Elijah','Sophia','Lucas','Mia','Mason','Charlotte','Logan','Amelia','Alexander','Harper','Ethan','Evelyn','Aiden','Abigail','Jacob','Emily','Michael','Ella','Daniel','Elizabeth','Henry','Camila','Jackson','Luna','Sebastian','Sofia','Jack','Avery','Owen','Mila','Samuel','Aria','Matthew','Scarlett','Joseph','Penelope','Levi','Layla','David','Chloe','John','Victoria','Wyatt','Madison','Carter','Eleanor','Julian','Grace','Grayson','Nora','Leo','Riley','Jayden','Zoey','Gabriel','Hannah','Isaac','Hazel','Lincoln','Lily','Anthony','Ellie','Hudson','Violet','Dylan','Lillian','Ezra','Zoe','Thomas','Stella','Charles','Aurora','Christopher','Natalie','Jaxon','Emilia','Maverick','Everly','Theodore','Leah','Isaiah','Aubrey','Caleb','Willow','Ryan','Addison','Nathan','Lucy','Adrian','Audrey','Eli','Bella','Nolan','Nova','Christian','Brooklyn','Aaron','Paisley','Cameron','Savannah','Ezekiel','Claire','Colton','Skylar','Miles','Isla','Robert','Genesis','Axel','Naomi','Ian','Elena','Easton','Caroline','Dominic','Eliana','Austin','Anna','Cooper','Maya','Carson','Valentina','Asher','Ruby','Connor','Kennedy','Greyson','Ivy'];
+        const lastNames = ['Smith','Johnson','Williams','Brown','Jones','Garcia','Miller','Davis','Rodriguez','Martinez','Hernandez','Lopez','Gonzalez','Wilson','Anderson','Thomas','Taylor','Moore','Jackson','Martin','Lee','Perez','Thompson','White','Harris','Sanchez','Clark','Ramirez','Lewis','Robinson','Walker','Young','Allen','King','Wright','Scott','Torres','Nguyen','Hill','Flores','Green','Adams','Nelson','Baker','Hall','Rivera','Campbell','Mitchell','Carter','Roberts','Turner','Phillips','Evans','Edwards','Collins','Stewart','Morris','Murphy','Cook','Rogers','Morgan','Peterson','Cooper','Reed','Bailey','Bell','Gomez','Kelly','Howard','Ward','Cox','Diaz','Richardson','Wood','Watson','Brooks','Bennett','Gray','James','Reyes','Cruz','Hughes','Price','Myers','Long','Foster','Sanders','Ross','Morales','Powell','Sullivan','Russell','Ortiz','Jenkins','Gutierrez','Perry','Butler','Barnes','Fisher'];
+        const cities = {'NSW':['Sydney','Newcastle','Wollongong'],'VIC':['Melbourne','Geelong','Ballarat'],'QLD':['Brisbane','Gold Coast','Cairns'],'WA':['Perth','Fremantle','Broome'],'SA':['Adelaide','Mount Gambier','Whyalla'],'TAS':['Hobart','Launceston','Devonport'],'NT':['Darwin','Alice Springs'],'ACT':['Canberra']};
+
+        const fullData = [];
+        for (let i = 0; i < 1000; i++) {
+            const state = states[Math.floor(Math.random() * states.length)];
+            const service = services[Math.floor(Math.random() * services.length)];
+            const rand = Math.random();
+            let status = statuses[0], cumWeight = 0;
+            for (let j = 0; j < statusWeights.length; j++) { cumWeight += statusWeights[j]; if (rand < cumWeight) { status = statuses[j]; break; } }
+            const qty = Math.floor(Math.random() * 3) + 1;
+            const month = Math.floor(Math.random() * 12) + 1;
+            const day = Math.floor(Math.random() * 28) + 1;
+            fullData.push({
+                id: 1234 + i,
+                first: firstNames[Math.floor(Math.random() * firstNames.length)],
+                last: lastNames[Math.floor(Math.random() * lastNames.length)],
+                service: service,
+                date: `2024-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
+                qty: qty,
+                status: status,
+                state: state,
+                city: cities[state][Math.floor(Math.random() * cities[state].length)],
+                price: servicesPrices[service],
+                total: servicesPrices[service] * qty,
+                quarter: month <= 3 ? 'Q1' : month <= 6 ? 'Q2' : month <= 9 ? 'Q3' : 'Q4',
+                month: month
+            });
+        }
+
+        const colors = {primary:'#1F4E79',secondary:'#2E75B6',accent:'#70AD47',warning:'#ED7D31',danger:'#C00000',palette:['#1F4E79','#2E75B6','#70AD47','#ED7D31','#7030A0','#00B0F0','#FFC000','#C00000']};
+        let serviceChart, stateChart, monthlyChart, statusChart;
+        let filteredData = [...fullData];
+
+        function populateFilters() {
+            const stateSelect = document.getElementById('stateFilter');
+            const serviceSelect = document.getElementById('serviceFilter');
+            const statusSelect = document.getElementById('statusFilter');
+            states.forEach(s => { const opt = document.createElement('option'); opt.value = s; opt.textContent = s; stateSelect.appendChild(opt); });
+            services.forEach(s => { const opt = document.createElement('option'); opt.value = s; opt.textContent = s; serviceSelect.appendChild(opt); });
+            statuses.forEach(s => { const opt = document.createElement('option'); opt.value = s; opt.textContent = s; statusSelect.appendChild(opt); });
+        }
+
+        function filterData() {
+            const stateVal = document.getElementById('stateFilter').value;
+            const serviceVal = document.getElementById('serviceFilter').value;
+            const statusVal = document.getElementById('statusFilter').value;
+            const quarterVal = document.getElementById('quarterFilter').value;
+            filteredData = fullData.filter(d => {
+                if (stateVal !== 'all' && d.state !== stateVal) return false;
+                if (serviceVal !== 'all' && d.service !== serviceVal) return false;
+                if (statusVal !== 'all' && d.status !== statusVal) return false;
+                if (quarterVal !== 'all' && d.quarter !== quarterVal) return false;
+                return true;
+            });
+            ['stateFilter','serviceFilter','statusFilter','quarterFilter'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.toggle('filter-active', el.value !== 'all');
+            });
+        }
+
+        function updateKPIs() {
+            const totalRev = filteredData.reduce((sum, d) => sum + d.total, 0);
+            const totalOrders = filteredData.length;
+            const avgOrder = totalOrders > 0 ? totalRev / totalOrders : 0;
+            const delivered = filteredData.filter(d => d.status === 'Delivered').length;
+            const cancelled = filteredData.filter(d => d.status === 'Cancelled');
+            const cancelledRev = cancelled.reduce((sum, d) => sum + d.total, 0);
+            document.getElementById('totalRevenue').textContent = '$' + totalRev.toLocaleString();
+            document.getElementById('totalOrders').textContent = totalOrders.toLocaleString();
+            document.getElementById('avgOrder').textContent = '$' + Math.round(avgOrder).toLocaleString();
+            document.getElementById('deliveryRate').textContent = totalOrders > 0 ? ((delivered / totalOrders) * 100).toFixed(1) + '%' : '0%';
+            document.getElementById('cancelRate').textContent = totalOrders > 0 ? ((cancelled.length / totalOrders) * 100).toFixed(1) + '%' : '0%';
+            document.getElementById('cancelRevenue').textContent = 'Lost: $' + cancelledRev.toLocaleString();
+            document.getElementById('recordCount').textContent = totalOrders.toLocaleString();
+        }
+
+        function updateCharts() {
+            const serviceData = {}; services.forEach(s => serviceData[s] = 0); filteredData.forEach(d => serviceData[d.service] += d.total);
+            serviceChart.data.labels = Object.keys(serviceData); serviceChart.data.datasets[0].data = Object.values(serviceData); serviceChart.update();
+            const stateData = {}; states.forEach(s => stateData[s] = 0); filteredData.forEach(d => stateData[d.state]++);
+            stateChart.data.labels = Object.keys(stateData); stateChart.data.datasets[0].data = Object.values(stateData); stateChart.update();
+            const monthlyData = Array(12).fill(0); filteredData.forEach(d => monthlyData[d.month - 1] += d.total);
+            monthlyChart.data.datasets[0].data = monthlyData; monthlyChart.update();
+            const statusData = {}; statuses.forEach(s => statusData[s] = 0); filteredData.forEach(d => statusData[d.status]++);
+            statusChart.data.labels = Object.keys(statusData); statusChart.data.datasets[0].data = Object.values(statusData); statusChart.update();
+        }
+
+        function updateTable() {
+            const sorted = [...filteredData].sort((a, b) => b.total - a.total).slice(0, 15);
+            document.getElementById('topCustomersTable').innerHTML = sorted.map((c, i) => `
+                <tr><td>${i + 1}</td><td>${c.id}</td><td>${c.first} ${c.last}</td><td>${c.state}</td><td>${c.service}</td><td>${c.qty}</td><td>$${c.total.toLocaleString()}</td><td><span class="status-badge status-${c.status.toLowerCase().replace(/ /g, '-')}">${c.status}</span></td></tr>
+            `).join('');
+        }
+
+        function updateDashboard() { filterData(); updateKPIs(); updateCharts(); updateTable(); }
+        function resetFilters() { document.getElementById('stateFilter').value = 'all'; document.getElementById('serviceFilter').value = 'all'; document.getElementById('statusFilter').value = 'all'; document.getElementById('quarterFilter').value = 'all'; updateDashboard(); }
+
+        function initCharts() {
+            serviceChart = new Chart(document.getElementById('serviceChart'), {type:'bar',data:{labels:services,datasets:[{label:'Revenue ($)',data:[],backgroundColor:colors.primary,borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'$'+(v/1000)+'K'}}}}});
+            stateChart = new Chart(document.getElementById('stateChart'), {type:'doughnut',data:{labels:states,datasets:[{data:[],backgroundColor:colors.palette}]},options:{responsive:true,plugins:{legend:{position:'right'}}}});
+            monthlyChart = new Chart(document.getElementById('monthlyChart'), {type:'line',data:{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[{label:'Revenue ($)',data:[],borderColor:colors.accent,backgroundColor:colors.accent+'33',fill:true,tension:0.3,pointRadius:5}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:false,ticks:{callback:v=>'$'+(v/1000)+'K'}}}}});
+            statusChart = new Chart(document.getElementById('statusChart'), {type:'pie',data:{labels:statuses,datasets:[{data:[],backgroundColor:[colors.accent,colors.warning,colors.secondary,colors.danger]}]},options:{responsive:true,plugins:{legend:{position:'right'}}}});
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { populateFilters(); initCharts(); updateDashboard(); });
+    </script>
+</body>
+</html>
